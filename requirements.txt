@@ -1,0 +1,7 @@
+torch
+librosa
+soundfile
+torchaudio
+coqpit
+TTS
+openai-whisper
