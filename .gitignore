@@ -89,6 +89,9 @@ app/backend/flask_session/
 # Voice database and audio files
 app/voices.json
 app/backend/venv/
+models/voices/*.wav
+models/voices/*.mp3
+models/voices/*.flac
 
 # Generated audio files
 output/app/*.wav
