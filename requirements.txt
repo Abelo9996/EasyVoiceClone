@@ -1,7 +1,7 @@
-torch
+torch>=2.0.0
+numpy<2.0.0
 librosa
 soundfile
 torchaudio
-coqpit
-TTS
-openai-whisper
+coqui-tts
+git+https://github.com/openai/whisper.git

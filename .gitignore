@@ -1,0 +1,97 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb_checkpoints/
+
+# Audio files (except .gitkeep)
+data/**/*.wav
+data/**/*.mp3
+data/**/*.flac
+data/**/*.m4a
+data/**/*.ogg
+!data/.gitkeep
+!data/example_audio/.gitkeep
+
+# Output files
+output/*.wav
+output/*.mp3
+!output/.gitkeep
+
+# Models (keep only .gitkeep)
+models/*.pt
+models/*.pth
+models/*.onnx
+models/pretrained/
+!models/.gitkeep
+
+# Transcripts
+*.txt
+!requirements.txt
+
+# Temporary files
+*.log
+*.tmp
+.cache/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Node modules
+node_modules/
+
+# React build
+app/frontend/build/
+
+# Flask session
+app/backend/flask_session/
+
+# Voice database and audio files
+app/voices.json
+app/backend/venv/
+
+# Generated audio files
+output/app/*.wav
+
+# npm lock files (optional, some teams prefer to keep)
+# package-lock.json
