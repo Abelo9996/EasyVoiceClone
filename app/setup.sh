@@ -24,7 +24,7 @@ else
 fi
 
 # Backend Setup
-echo "📦 Setting up backend..."
+echo "📦 Setting up backend...."
 cd "$APP_DIR/backend"
 
 # Create virtual environment if it doesn't exist
