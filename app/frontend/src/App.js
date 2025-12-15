@@ -3,13 +3,12 @@ import axios from 'axios';
 import { Toaster, toast } from 'react-hot-toast';
 import VoiceManager from './components/VoiceManager';
 import SynthesisPanel from './components/SynthesisPanel';
-import BatchSynthesis from './components/BatchSynthesis';
-import PdfReader from './components/PdfReader';
+import PdfReaderChat from './components/PdfReaderChat';
 
 function App() {
   const [voices, setVoices] = useState([]);
   const [selectedVoice, setSelectedVoice] = useState(null);
-  const [activeTab, setActiveTab] = useState('single'); // single, batch, pdf, voices
+  const [activeTab, setActiveTab] = useState('synthesis'); // synthesis, pdf, voices
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -75,24 +74,14 @@ function App() {
         <div className="border-b border-gray-200">
           <nav className="-mb-px flex space-x-8">
             <button
-              onClick={() => setActiveTab('single')}
+              onClick={() => setActiveTab('synthesis')}
               className={`${
-                activeTab === 'single'
+                activeTab === 'synthesis'
                   ? 'border-purple-500 text-purple-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
             >
-              Single Synthesis
-            </button>
-            <button
-              onClick={() => setActiveTab('batch')}
-              className={`${
-                activeTab === 'batch'
-                  ? 'border-purple-500 text-purple-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
-            >
-              Batch Synthesis
+              🎤 Synthesize
             </button>
             <button
               onClick={() => setActiveTab('pdf')}
@@ -120,7 +109,7 @@ function App() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'single' && (
+        {activeTab === 'synthesis' && (
           <SynthesisPanel
             voices={voices}
             selectedVoice={selectedVoice}
@@ -128,16 +117,8 @@ function App() {
           />
         )}
         
-        {activeTab === 'batch' && (
-          <BatchSynthesis
-            voices={voices}
-            selectedVoice={selectedVoice}
-            onVoiceSelect={setSelectedVoice}
-          />
-        )}
-        
         {activeTab === 'pdf' && (
-          <PdfReader
+          <PdfReaderChat
             voices={voices}
             onVoicesUpdate={loadVoices}
           />

@@ -16,6 +16,7 @@ import PyPDF2
 import nltk
 import re
 from io import BytesIO
+from deep_translator import GoogleTranslator
 
 app = Flask(__name__)
 CORS(app)
@@ -86,6 +87,30 @@ def clean_text(text):
     # Remove multiple newlines
     text = re.sub(r'\n+', '\n', text)
     return text.strip()
+
+def translate_text(text, source_lang='auto', target_lang='en'):
+    """
+    Translate text from source language to target language
+    
+    Args:
+        text: Text to translate
+        source_lang: Source language code (default 'auto' for auto-detection)
+        target_lang: Target language code
+        
+    Returns:
+        Translated text
+    """
+    try:
+        if source_lang == target_lang or target_lang == 'original':
+            return text
+            
+        translator = GoogleTranslator(source=source_lang, target=target_lang)
+        translated = translator.translate(text)
+        return translated
+    except Exception as e:
+        print(f"Translation error: {str(e)}")
+        # If translation fails, return original text
+        return text
 
 def chunk_text_by_sentences(text, max_chars=500, min_chars=100):
     """
@@ -236,6 +261,8 @@ def synthesize():
     voice_id = data.get('voice_id')
     text = data.get('text')
     language = data.get('language', 'en')
+    translate_to = data.get('translate_to')  # New parameter for translation
+    source_lang = data.get('source_lang', 'auto')  # Source language for translation
     
     if not voice_id or not text:
         return jsonify({'error': 'Missing voice_id or text'}), 400
@@ -252,6 +279,12 @@ def synthesize():
         return jsonify({'error': 'Voice audio file not found'}), 404
     
     try:
+        # Translate text if requested
+        original_text = text
+        if translate_to and translate_to != 'original':
+            text = translate_text(text, source_lang=source_lang, target_lang=translate_to)
+            print(f"Translated from {source_lang} to {translate_to}: {original_text[:50]}... -> {text[:50]}...")
+        
         # Generate output filename
         output_id = str(uuid.uuid4())
         output_filename = f"{output_id}.wav"
@@ -266,11 +299,22 @@ def synthesize():
             file_path=str(output_path)
         )
         
-        return jsonify({
+        response_data = {
             'success': True,
             'audio_id': output_id,
             'audio_url': f'/api/audio/{output_id}'
-        })
+        }
+        
+        # Include translated text if translation was performed
+        if translate_to and translate_to != 'original':
+            response_data['original_text'] = original_text
+            response_data['translated_text'] = text
+            response_data['translation'] = {
+                'from': source_lang,
+                'to': translate_to
+            }
+        
+        return jsonify(response_data)
     
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -292,6 +336,8 @@ def batch_synthesize():
     voice_id = data.get('voice_id')
     texts = data.get('texts', [])
     language = data.get('language', 'en')
+    translate_to = data.get('translate_to')  # New parameter for translation
+    source_lang = data.get('source_lang', 'auto')  # Source language for translation
     
     if not voice_id or not texts:
         return jsonify({'error': 'Missing voice_id or texts'}), 400
@@ -309,6 +355,11 @@ def batch_synthesize():
     
     for idx, text in enumerate(texts):
         try:
+            # Translate text if requested
+            original_text = text
+            if translate_to and translate_to != 'original':
+                text = translate_text(text, source_lang=source_lang, target_lang=translate_to)
+            
             output_id = str(uuid.uuid4())
             output_filename = f"{output_id}.wav"
             output_path = OUTPUT_DIR / output_filename
@@ -320,13 +371,20 @@ def batch_synthesize():
                 file_path=str(output_path)
             )
             
-            results.append({
+            result = {
                 'index': idx,
                 'success': True,
                 'audio_id': output_id,
                 'audio_url': f'/api/audio/{output_id}',
                 'text': text
-            })
+            }
+            
+            # Include translation info if translation was performed
+            if translate_to and translate_to != 'original':
+                result['original_text'] = original_text
+                result['translated_text'] = text
+            
+            results.append(result)
         except Exception as e:
             results.append({
                 'index': idx,
@@ -394,6 +452,8 @@ def synthesize_pdf():
     voice_id = data['voice_id']
     chunks = data['chunks']
     language = data.get('language', 'en')
+    translate_to = data.get('translate_to')  # New parameter for translation
+    source_lang = data.get('source_lang', 'auto')  # Source language for translation
     
     # Validate voice exists
     db = load_voices_db()
@@ -406,10 +466,19 @@ def synthesize_pdf():
     results = []
     tts = get_tts_model()
     
+    print(f"PDF Synthesis: Processing {len(chunks)} chunks with voice {voice_id}")
+    print(f"Translation: translate_to={translate_to}, source_lang={source_lang}")
+    
     for idx, chunk in enumerate(chunks):
         try:
+            # Translate chunk if requested
+            original_chunk = chunk
+            if translate_to and translate_to != 'original':
+                chunk = translate_text(chunk, source_lang=source_lang, target_lang=translate_to)
+                print(f"Chunk {idx}: Translated {len(original_chunk)} chars to {len(chunk)} chars")
+            
             output_id = str(uuid.uuid4())
-            output_filename = f"pdf_{output_id}.wav"
+            output_filename = f"{output_id}.wav"
             output_path = OUTPUT_DIR / output_filename
             
             tts.tts_to_file(
@@ -419,15 +488,25 @@ def synthesize_pdf():
                 file_path=str(output_path)
             )
             
-            results.append({
+            result = {
                 'index': idx,
                 'success': True,
                 'audio_id': output_id,
                 'audio_url': f'/api/audio/{output_id}',
                 'chunk': chunk[:100] + '...' if len(chunk) > 100 else chunk,
                 'chunk_length': len(chunk)
-            })
+            }
+            
+            # Include translation info if translation was performed
+            if translate_to and translate_to != 'original':
+                result['original_chunk'] = original_chunk[:100] + '...' if len(original_chunk) > 100 else original_chunk
+                result['translated_chunk'] = chunk[:100] + '...' if len(chunk) > 100 else chunk
+            
+            results.append(result)
         except Exception as e:
+            print(f"Error processing chunk {idx}: {str(e)}")
+            import traceback
+            traceback.print_exc()
             results.append({
                 'index': idx,
                 'success': False,
@@ -435,12 +514,17 @@ def synthesize_pdf():
                 'chunk': chunk[:100] + '...' if len(chunk) > 100 else chunk
             })
     
+    successful_count = sum(1 for r in results if r.get('success', False))
+    failed_count = sum(1 for r in results if not r.get('success', False))
+    
+    print(f"PDF Synthesis complete: {successful_count} successful, {failed_count} failed")
+    
     return jsonify({
         'success': True,
         'results': results,
         'total_chunks': len(chunks),
-        'successful': sum(1 for r in results if r['success']),
-        'failed': sum(1 for r in results if not r['success'])
+        'successful': successful_count,
+        'failed': failed_count
     })
 
 @app.route('/api/languages', methods=['GET'])
