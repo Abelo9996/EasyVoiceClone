@@ -50,7 +50,7 @@ function PdfReaderChat({ voices, onVoicesUpdate }) {
     fetchLanguages();
   }, []);
 
-  // Save history to localStorage whenever it changes
+  // Saves history to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem('pdfReaderHistory', JSON.stringify(history));
   }, [history]);
