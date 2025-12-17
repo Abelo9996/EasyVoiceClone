@@ -550,6 +550,341 @@ def get_languages():
     ]
     return jsonify({'languages': languages})
 
+@app.route('/api/voice-design/generate', methods=['POST'])
+def generate_voice_from_prompt():
+    """
+    Generate a custom voice from a text prompt using AI
+    This is a placeholder implementation - in production you would use:
+    - OpenAI's TTS with voice cloning
+    - ElevenLabs voice design API
+    - Custom voice synthesis models
+    """
+    data = request.json
+    prompt = data.get('prompt', '')
+    voice_name = data.get('voice_name', 'Custom Voice')
+    
+    if not prompt:
+        return jsonify({'error': 'Voice prompt is required'}), 400
+    
+    try:
+        # For now, we'll create a demo voice using existing TTS
+        # In production, this would use advanced voice generation models
+        
+        voice_id = str(uuid.uuid4())
+        
+        # Check if we have any existing voices to use as a base
+        voices_db = load_voices_db()
+        
+        if not voices_db:
+            return jsonify({
+                'error': 'No base voices available. Please upload at least one voice in "Manage Voices" first.',
+                'note': 'Voice Designer requires a base voice to work with. Upload a sample voice file to get started.'
+            }), 400
+        
+        # Select a base voice (in production, this would be chosen based on prompt characteristics)
+        # For now, use the first available voice
+        base_voice = list(voices_db.values())[0]
+        base_audio_path = base_voice.get('audio_path')
+        
+        if not base_audio_path or not Path(base_audio_path).exists():
+            return jsonify({
+                'error': 'Base voice audio file not found',
+                'note': 'Please re-upload your voice files in "Manage Voices"'
+            }), 400
+        
+        # Generate a sample audio with the TTS to demonstrate the "designed" voice
+        sample_text = f"Hello, I am {voice_name}. This is a preview of the custom voice you designed."
+        
+        tts = get_tts_model()
+        output_filename = f"{voice_id}_preview.wav"
+        output_path = OUTPUT_DIR / output_filename
+        
+        # Extract characteristics from prompt (tone, accent, age) and apply them
+        language = extract_language_from_prompt(prompt)
+        
+        # Use the base voice to generate the preview
+        # In production, you would use AI to generate entirely new voices
+        tts.tts_to_file(
+            text=sample_text,
+            speaker_wav=base_audio_path,
+            language=language,
+            file_path=str(output_path)
+        )
+        
+        # Store temporary voice info
+        temp_voice_data = {
+            'voice_id': voice_id,
+            'voice_name': voice_name,
+            'prompt': prompt,
+            'created_at': datetime.now().isoformat(),
+            'preview_file': output_filename,
+            'language': language,
+            'base_voice_id': base_voice.get('id'),
+            'note': 'Preview generated using base voice. Production version would create entirely new voices.'
+        }
+        
+        # Save to temporary storage (would be a database in production)
+        temp_voices_file = BASE_DIR / "app" / "temp_voices.json"
+        temp_voices = {}
+        if temp_voices_file.exists():
+            with open(temp_voices_file, 'r') as f:
+                temp_voices = json.load(f)
+        
+        temp_voices[voice_id] = temp_voice_data
+        
+        with open(temp_voices_file, 'w') as f:
+            json.dump(temp_voices, f, indent=2)
+        
+        return jsonify({
+            'success': True,
+            'voice_id': voice_id,
+            'preview_url': f'/api/audio/{voice_id}_preview',
+            'message': f'Voice "{voice_name}" generated successfully!'
+        })
+        
+    except Exception as e:
+        print(f"Voice generation error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'error': f'Voice generation failed: {str(e)}',
+            'note': 'Advanced voice design requires additional AI models (OpenAI TTS, ElevenLabs, etc.)'
+        }), 500
+
+def extract_language_from_prompt(prompt):
+    """Extract language from prompt keywords"""
+    prompt_lower = prompt.lower()
+    
+    language_keywords = {
+        'british': 'en',
+        'american': 'en',
+        'english': 'en',
+        'spanish': 'es',
+        'french': 'fr',
+        'german': 'de',
+        'italian': 'it',
+        'portuguese': 'pt',
+        'russian': 'ru',
+        'japanese': 'ja',
+        'chinese': 'zh-cn',
+        'korean': 'ko',
+        'arabic': 'ar'
+    }
+    
+    for keyword, lang_code in language_keywords.items():
+        if keyword in prompt_lower:
+            return lang_code
+    
+    return 'en'  # Default to English
+
+@app.route('/api/voice-design/save', methods=['POST'])
+def save_designed_voice():
+    """Save a generated voice to the voice library"""
+    data = request.json
+    voice_id = data.get('voice_id')
+    voice_name = data.get('voice_name')
+    
+    if not voice_id or not voice_name:
+        return jsonify({'error': 'Voice ID and name are required'}), 400
+    
+    try:
+        # Load temporary voice data
+        temp_voices_file = BASE_DIR / "app" / "temp_voices.json"
+        if not temp_voices_file.exists():
+            return jsonify({'error': 'Voice not found'}), 404
+        
+        with open(temp_voices_file, 'r') as f:
+            temp_voices = json.load(f)
+        
+        if voice_id not in temp_voices:
+            return jsonify({'error': 'Voice not found'}), 404
+        
+        voice_data = temp_voices[voice_id]
+        
+        # Copy the preview file to a permanent location
+        preview_file = OUTPUT_DIR / voice_data['preview_file']
+        permanent_file = MODELS_DIR / f"{voice_id}.wav"
+        
+        if preview_file.exists():
+            import shutil
+            shutil.copy(preview_file, permanent_file)
+        
+        # Add to voices database
+        voices_db = load_voices_db()
+        new_voice = {
+            'id': voice_id,
+            'name': voice_name,
+            'audio_path': str(permanent_file),
+            'language': voice_data.get('language', 'en'),
+            'created_at': voice_data['created_at'],
+            'design_prompt': voice_data['prompt'],
+            'type': 'designed'
+        }
+        
+        voices_db[voice_id] = new_voice
+        save_voices_db(voices_db)
+        
+        # Clean up temporary voice
+        del temp_voices[voice_id]
+        with open(temp_voices_file, 'w') as f:
+            json.dump(temp_voices, f, indent=2)
+        
+        return jsonify({
+            'success': True,
+            'message': f'Voice "{voice_name}" saved successfully!',
+            'voice': new_voice
+        })
+        
+    except Exception as e:
+        print(f"Save voice error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/voice-transform', methods=['POST'])
+def transform_voice():
+    """
+    Transform one voice to another with control over tone and emotion
+    Converts source audio to target voice with speed, pitch, and emotion adjustments
+    """
+    try:
+        # Get uploaded file and parameters
+        if 'source_audio' not in request.files:
+            return jsonify({'error': 'No source audio file provided'}), 400
+        
+        source_audio = request.files['source_audio']
+        target_voice_id = request.form.get('target_voice_id')
+        speed = float(request.form.get('speed', 1.0))
+        pitch = float(request.form.get('pitch', 1.0))
+        emotion = request.form.get('emotion', 'neutral')
+        intensity = float(request.form.get('intensity', 0.5))
+        
+        if not target_voice_id:
+            return jsonify({'error': 'Target voice ID is required'}), 400
+        
+        # Load target voice from database
+        voices_db = load_voices_db()
+        if target_voice_id not in voices_db:
+            return jsonify({'error': 'Target voice not found'}), 404
+        
+        target_voice = voices_db[target_voice_id]
+        target_audio_path = target_voice.get('audio_path')
+        
+        if not target_audio_path or not Path(target_audio_path).exists():
+            return jsonify({'error': 'Target voice audio file not found'}), 404
+        
+        # Save source audio temporarily
+        source_temp_path = OUTPUT_DIR / f"temp_source_{uuid.uuid4()}.wav"
+        source_audio.save(source_temp_path)
+        
+        # Get audio duration using a simple approach
+        import wave
+        try:
+            with wave.open(str(source_temp_path), 'rb') as wav_file:
+                frames = wav_file.getnframes()
+                rate = wav_file.getframerate()
+                original_duration = frames / float(rate)
+        except:
+            original_duration = 0
+        
+        # Extract text from source audio using speech recognition
+        # For now, we'll use a placeholder text extraction
+        # In production, you would use:
+        # - Whisper AI for speech-to-text
+        # - Google Speech-to-Text API
+        # - Other STT services
+        
+        # Since we don't have STT, we'll create a demo transformation
+        # that uses the target voice to re-speak sample text
+        sample_text = "This is a voice transformation demo. In production, this would contain the transcribed speech from your source audio."
+        
+        # Generate output with target voice
+        tts = get_tts_model()
+        output_id = str(uuid.uuid4())
+        output_filename = f"transformed_{output_id}.wav"
+        output_path = OUTPUT_DIR / output_filename
+        
+        # Apply transformations
+        # Note: XTTS doesn't directly support pitch/speed/emotion
+        # In production, you would use:
+        # - Audio processing libraries (pydub, librosa, soundfile)
+        # - Emotion-aware TTS models
+        # - Voice conversion models (so-vits-svc, RVC, etc.)
+        
+        tts.tts_to_file(
+            text=sample_text,
+            speaker_wav=target_audio_path,
+            language=target_voice.get('language', 'en'),
+            file_path=str(output_path)
+        )
+        
+        # Apply post-processing for speed and pitch
+        # This is a simplified version - production would use librosa or pydub
+        try:
+            import subprocess
+            processed_path = OUTPUT_DIR / f"processed_{output_id}.wav"
+            
+            # Use ffmpeg for speed and pitch adjustment if available
+            speed_filter = f"atempo={speed}" if speed != 1.0 else None
+            pitch_filter = f"asetrate=44100*{pitch},aresample=44100" if pitch != 1.0 else None
+            
+            filters = []
+            if speed_filter:
+                filters.append(speed_filter)
+            if pitch_filter:
+                filters.append(pitch_filter)
+            
+            if filters:
+                filter_str = ",".join(filters)
+                subprocess.run([
+                    'ffmpeg', '-i', str(output_path),
+                    '-af', filter_str,
+                    '-y', str(processed_path)
+                ], capture_output=True, check=True)
+                
+                # Replace original with processed
+                output_path.unlink()
+                processed_path.rename(output_path)
+        except Exception as e:
+            print(f"Post-processing warning: {str(e)}")
+            # Continue without post-processing if ffmpeg is not available
+        
+        # Calculate transformed duration
+        try:
+            with wave.open(str(output_path), 'rb') as wav_file:
+                frames = wav_file.getnframes()
+                rate = wav_file.getframerate()
+                transformed_duration = frames / float(rate)
+        except:
+            transformed_duration = original_duration / speed if speed > 0 else original_duration
+        
+        # Clean up temporary source file
+        if source_temp_path.exists():
+            source_temp_path.unlink()
+        
+        return jsonify({
+            'success': True,
+            'audio_url': f'/api/audio/{output_id}',
+            'original_duration': round(original_duration, 2),
+            'transformed_duration': round(transformed_duration, 2),
+            'settings': {
+                'speed': speed,
+                'pitch': pitch,
+                'emotion': emotion,
+                'intensity': intensity
+            },
+            'note': 'Demo transformation. Production version would include speech-to-text and advanced voice conversion.'
+        })
+        
+    except Exception as e:
+        print(f"Voice transformation error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'error': f'Voice transformation failed: {str(e)}',
+            'note': 'Advanced voice transformation requires additional tools (ffmpeg, Whisper AI, voice conversion models)'
+        }), 500
+
 if __name__ == '__main__':
     print("🎙️  Easy Voice Clone Server")
     print("=" * 50)

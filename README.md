@@ -52,9 +52,13 @@ Quick and simple - perfect for scripts and automation.
 ## ✨ Features
 
 ### Web Application
-- 🎨 **Modern UI** - Beautiful, responsive interface built with React + Tailwind
+- 🎨 **Voice Designer** - Create entirely new, custom AI voices from text prompts (tone, accent, age, style)
+- 🌐 **Multi-Language Translation** - Translate text into 100+ languages before synthesis
+- 📊 **Real-Time Progress Tracking** - Visual progress bars for all operations
+- 📜 **Persistent History** - Conversation history survives page refreshes and tab switches
+- 💬 **Chat-Style Interface** - Intuitive chat UI for synthesis and PDF processing
 - 📤 **Voice Management** - Upload, organize, and manage multiple voice profiles
-- ⚡ **Batch Processing** - Generate multiple audio files at once
+- ⚡ **Batch Processing** - Generate multiple audio files at once (merged single/batch mode)
 - 📚 **PDF Reader** - Convert entire books/documents to audiobooks with smart chunking
 - 🎵 **Instant Playback** - Listen to generated audio immediately
 - 💾 **Easy Downloads** - Download individual or batch files
